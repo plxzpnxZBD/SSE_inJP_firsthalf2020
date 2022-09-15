@@ -1,0 +1,992 @@
+---
+title: "superspreading transmission"
+author: "Yanji Zhao"
+date: "2022/3/13"
+output: pdf_document
+---
+explore the superpreading potential of COVID-19 in different settings
+use the negative binormal (NB) distribution to estimate the reproduction number (R) and dispersion parameter (k).
+```{r}
+sel.index.array1 = which(!cluster.data$setting %in% c('community', 'sporadic', 'terminal'))
+fake.cluster.data1 = cluster.data
+fake.cluster.data1$offspring[sel.index.array1] = 0
+community = subset(fake.cluster.data1, subset = (setting != 'NA'), select = c(seed, offspring))
+
+sel.index.array2 = which(!cluster.data$setting %in% c('family', 'sporadic', 'terminal'))
+fake.cluster.data2 = cluster.data
+fake.cluster.data2$offspring[sel.index.array2] = 0
+family = subset(fake.cluster.data2, subset = (setting != 'NA'), select = c(seed, offspring))
+
+sel.index.array3 = which(!cluster.data$setting %in% c('hospital', 'sporadic', 'terminal'))
+fake.cluster.data3 = cluster.data
+fake.cluster.data3$offspring[sel.index.array3] = 0
+hospital = subset(fake.cluster.data3, subset = (setting != 'NA'), select = c(seed, offspring))
+
+sel.index.array4 = which(!cluster.data$setting %in% c('school', 'sporadic', 'terminal'))
+fake.cluster.data4 = cluster.data
+fake.cluster.data4$offspring[sel.index.array4] = 0
+school = subset(fake.cluster.data4, subset = (setting != 'NA'), select = c(seed, offspring))
+
+sel.index.array5 = which(!cluster.data$setting %in% c('work', 'sporadic', 'terminal'))
+fake.cluster.data5 = cluster.data
+fake.cluster.data5$offspring[sel.index.array5] = 0
+work = subset(fake.cluster.data5, subset = (setting != 'NA'), select = c(seed, offspring))
+
+
+
+```
+
+
+## over-dispersion
+```{r}
+## cluster.data is the rearranged data
+## get a new data frame whose rows are replicated by times=seed individually
+## Simply divide row 16 as two rows with seed =1 and offspring = 6 at this stage 
+##cluster1=cluster.data[-16,]
+##seperate=rbind(cluster1[rep(1:nrow(cluster1), times = cluster1$seed),],
+               ##c(1,6,'community'),c(1,6,'community'))
+##seperate$seed=as.numeric(seperate$seed)
+##seperate$offspring=as.numeric(seperate$offspring)
+
+with(seperate, tapply(offspring, setting, function(x) {  
+    sprintf("M (Var) = %1.2f (%1.2f)", mean(x), var(x))
+}))
+ 
+```
+
+
+Except for 'sporadic' and 'terminal', mean value of the outcome appears to vary by setting and variances within each level of setting are approximately higher than the means of 'community', 'hospital', 'work', thus we could consider negative binomial regression model to estimate the over-dispersion
+seed is x and offspring is y.  Let yi, i=1,2..n be realizations of independent negative binomial random variables i.e. Yi$y~NB(R0,k)$ with mean $\mu i$ and variance  $\mu i(1+\frac{\mu i}{k})$ where R0 is basic reproductive number and k is dispersion parameter. As negative binomial distribution is mixture of Poisson distribution and Gamma($\alpha$,$\beta$) with mean 1 i.e.  $\alpha=\frac1\beta$. pmf is 
+$f(yi;\mu i,k)=\frac{\Gamma (yi+k^{-1})}{yi*!\Gamma(k^{-1})} (\frac{k\mu i}{1+k\mu i})^{yi}(\frac{1}{1+k\mu i})^{1/k}$
+And then log likelihood function is
+$l=\sum^{n}_{i=1}{mi} [\sum^{yi^*}_{j=0}{log(1+kj)}+yilog\frac{\mu i}{1+k\mu i}-\frac1klog(1+k\mu i)] $
+where mi is a fixed weight for theith observation,$yi^*=yi-1$,$\sum^{yi^*}_{j=0}{log(1+kj)}$ is 0 when $yi^*<0$
+
+
+The traditional negative binomial regression model is $ log(\mu i)=\beta0*x1+\beta2*x2..$
+The ML estimate of the mean of the offspring distribution (i.e. the reproductive number, R0 or R) is simply the sample mean and the dispersion parameter k is asymptotically orthogonal to the mean and so is estimated independently after substituting the ML estimate of the mean into the likelihood expression
+
+## Seperate (Discard)
+```{r}
+sel.index.array1s = which(!seperate$setting %in% c('community', 'sporadic', 'terminal'))
+fake.cluster.data1s = seperate
+fake.cluster.data1s$offspring[sel.index.array1s] = 0
+community.s = subset(fake.cluster.data1s, subset = (setting != 'NA'), select = c(seed, offspring))
+
+sel.index.array2s = which(!seperate$setting %in% c('family', 'sporadic', 'terminal'))
+fake.cluster.data2s = seperate
+fake.cluster.data2s$offspring[sel.index.array2s] = 0
+family.s = subset(fake.cluster.data2s, subset = (setting != 'NA'), select = c(seed, offspring))
+
+sel.index.array3s = which(!seperate$setting %in% c('hospital', 'sporadic', 'terminal'))
+fake.cluster.data3s = seperate
+fake.cluster.data3s$offspring[sel.index.array3s] = 0
+hospital.s = subset(fake.cluster.data3s, subset = (setting != 'NA'), select = c(seed, offspring))
+
+sel.index.array4s = which(!seperate$setting %in% c('school', 'sporadic', 'terminal'))
+fake.cluster.data4s = seperate
+fake.cluster.data4s$offspring[sel.index.array4s] = 0
+school.s = subset(fake.cluster.data4s, subset = (setting != 'NA'), select = c(seed, offspring))
+
+sel.index.array5s = which(!seperate$setting %in% c('work', 'sporadic', 'terminal'))
+fake.cluster.data5s = seperate
+fake.cluster.data5s$offspring[sel.index.array5s] = 0
+work.s = subset(fake.cluster.data5s, subset = (setting != 'NA'), select = c(seed, offspring))
+```
+
+
+
+
+
+
+
+
+## MLE (Discard.Ragarded as comparision if it's required)
+```{r}
+## offspring ~NB(xR, xk)
+cum.loglike = function(offspring, seed,R, k )
+{
+  ll =sum(dnbinom(x = as.numeric(offspring), mu = as.numeric(seed)*R, size = as.numeric(seed)*k, log = T))
+  return(ll)
+}
+```
+
+```{r}
+## select range of R and k manually based on data
+ll.Rk=function(offspring,seed,min.R, max.R, min.k, max.k )
+{
+ ll.mat=NULL
+ R.seq=seq(from = min.R, to = max.R, length.out = 100) 
+ ## x, R are supposed to be both greater than 0
+ k.seq=seq(from = min.k, to = max.k, length.out = 300)
+ ## seems the band of ci of k is narrower and value of estimator is small, so more k simulation values are observed
+ for(i in 1:length(R.seq))
+ {
+   ll.seq=NULL
+   for(j in 1:length(k.seq))
+   {
+     ll.ij=cum.loglike(offspring,seed, R= R.seq[i], k=k.seq[j] )
+     ll.seq=c(ll.seq,ll.ij)
+   }
+  ll.dat=data.frame(ll=ll.seq,k=k.seq)
+  ll.dat$R = R.seq[i]
+  ll.mat = rbind(ll.mat, ll.dat)
+ }
+ 
+ return(ll.mat)
+}
+
+
+```
+
+```{r}
+## after getting matrix of log likelihood by ll.Rk
+## If sample size is large, sample mean is approximately normally distributed
+##  likelihood ratio based confidence interval with chisq 1
+mle.kR=function(ll.mat)
+{
+  R.mle=ll.mat$R[which.max(ll.mat$ll)]
+  k.mle=ll.mat$k[which.max(ll.mat$ll)]
+  llrange.withR=ll.mat[which(ll.mat$R==R.mle),]
+  llrange.withk=ll.mat[which(ll.mat$k==k.mle),]
+  ci.R=range(llrange.withk$R[which(llrange.withk$ll+qchisq(0.95,1)>max(llrange.withk$ll))])
+  ci.k=range(llrange.withR$k[which(llrange.withR$ll+qchisq(0.95,1)>max(llrange.withR$ll))])
+  tab=matrix(c(R.mle,ci.R,k.mle,ci.k), ncol=3, byrow=TRUE)
+  colnames(tab) = c('MLE', 'Lower', 'Upper')
+  rownames(tab) = c('R', 'k')
+  
+  return(as.table(tab))
+}
+
+```
+
+
+
+```{r}
+R.mle=llmat.community$R[which.max(llmat.community$ll)]
+  k.mle=llmat.community$k[which.max(llmat.community$ll)]
+  llrange.withR=llmat.community[which(llmat.community$R==R.mle),]
+  llrange.withk=llmat.community[which(llmat.community$k==k.mle),]
+  ci.R=range(llrange.withk$R[which(llrange.withk$ll+qchisq(0.95,1)>max(llrange.withk$ll))])
+  ci.k=range(llrange.withR$k[which(llrange.withR$ll+qchisq(0.95,1)>max(llrange.withR$ll))])
+```
+
+
+
+## Simulation for MLE (Discard)
+###Community
+```{r}
+llmat.community=ll.Rk(offspring=community$offspring,seed=community$seed, min.R=0.01, max.R=0.5, min.k=0.0001, max.k=0.2)
+                  
+```
+
+```{r}
+mle.kR(llmat.community)
+
+```
+
+## Family
+```{r}
+llmat.family=ll.Rk(offspring=family$offspring,seed=family$seed, min.R=0.01, max.R=0.5, min.k=0.001, max.k=0.4)
+```
+
+```{r}
+mle.kR(llmat.family)
+```
+
+##Hospital
+```{r}
+llmat.hospital=ll.Rk(offspring=hospital$offspring,seed=hospital$seed, min.R=0.01, max.R=8, min.k=0.0001, max.k=0.2)
+```
+
+```{r}
+mle.kR(llmat.hospital)
+
+```
+##School
+```{r}
+llmat.school=ll.Rk(offspring=school$offspring,seed=school$seed, min.R=0.001, max.R=0.8, min.k=0.0001, max.k=0.2)
+```
+
+```{r}
+mle.kR(llmat.school)
+
+```
+
+
+##Work
+```{r}
+llmat.work=ll.Rk(offspring=work$offspring,seed=work$seed, min.R=0.01, max.R=0.4, min.k=0.001, max.k=0.2)
+```
+
+```{r}
+mle.kR(llmat.work)
+
+```
+##all
+```{r}
+llmat.all=ll.Rk(offspring=cluster.data$offspring,seed=cluster.data$seed, min.R=0.1, max.R=0.7, min.k=0.01, max.k=0.5)
+```
+
+```{r}
+mle.kR(llmat.all)
+
+```
+
+
+
+
+
+##MCMC Metropolis-Hastings
+```{r}
+## Bayesian inference. Assume prior distribution of R and k ~Uniform(0,1) respectively
+## calculate log of posterior stationary density via log(prior*ML) since posterior density is proportional to likelihood prior (prior*ML)
+## para is a binary vector of parameters c(R,K)
+bayes=function(para,offspring, seed)
+{
+  ll =sum(dnbinom(x = as.numeric(offspring), mu = as.numeric(seed)*para[1], size =    as.numeric(seed)*para[2], log = T))
+  return(ll+dunif(para[1], min = 0, max = 1, log = T)+dunif(para[2], min = 0, max = 1, log = T))
+}
+  
+## bayes(c(0.069393939,0.004111371),offspring=community$offspring,seed=community$seed)
+```
+
+```{r}
+library(coda)
+metropolis=function(initial, iterations,offspring,seed)
+{
+  chain = array(dim = c(iterations + 1, 2))
+  chain[1, ] = initial
+  for(i in 1:iterations)
+  {
+    proposal.R=runif(1, min = max(-0.1, -chain[i,1]), max = min(0.1, 1 - chain[i,1]))+chain[i, 1]
+    proposal.k=runif(1, min = max(-0.1, -chain[i,2]), max = min(0.1, 1 - chain[i,2]))+chain[i, 2]
+    ratio=bayes(c(proposal.R,proposal.k),offspring,seed)-bayes(c(chain[i, 1], chain[i, 2]),offspring,seed)
+    if (runif(1, 0, 1) < min(1, exp(ratio))) chain[i + 1, ] = c(proposal.R, proposal.k)
+    else chain[i + 1, ] = chain[i, ]
+    
+  }
+  return(mcmc(chain))
+}
+  
+
+```
+
+```{r}
+visual=function(chain)
+{
+  Bayesian.R=median(chain[,1])
+  Bayesian.k=median(chain[,2])
+  cri.R=quantile(chain[,1],probs = c(0.05,0.95))
+  cri.k=quantile(chain[,2],probs = c(0.05,0.95))
+  tab=matrix(c(Bayesian.R,cri.R,Bayesian.k,cri.k), ncol=3, byrow=TRUE)
+  colnames(tab) = c('Bayesian estiamte', 'Lower', 'Upper')
+  rownames(tab) = c('R', 'k')
+  
+  return(as.table(tab))
+}
+  
+```
+
+
+
+## Community
+```{r}
+
+library(coda)
+mc.community=metropolis(initial = c(0.05,0.05),iterations = 80000, offspring=community$offspring, seed=community$seed)
+visual(mc.community[-(1:30000),])
+
+
+
+```
+ Bayesian estiamte       Lower       Upper
+R       0.106836804 0.045630240 0.330843169
+k       0.004000052 0.002173812 0.006767727
+
+
+```{r}
+library(lattice)
+par(mfrow=c(2,1))
+histogram(mc.community[,1], breaks=500, prob=T, main="", ylim=c(0, 10), las=1,
+     xlab="R", ylab="Probability density")
+histogram(mc.community[,2], breaks=500, freq=FALSE, main="", ylim=c(0, 10), las=1,
+     xlab="k", ylab="Probability density")
+```
+
+
+##Family
+```{r}
+
+mc.family=metropolis(initial = c(0.05,0.05),iterations = 80000, offspring=family$offspring, seed=family$seed)
+visual(mc.family[-(1:30000),])
+```
+Bayesian estiamte      Lower      Upper
+R        0.13798936 0.11338790 0.17064974
+k        0.14398080 0.09717099 0.20552035
+
+##Hospital
+```{r}
+
+mc.hospital=metropolis(initial = c(0.05,0.05),iterations = 80000, offspring=hospital$offspring, seed=hospital$seed)
+visual(mc.hospital[-(1:30000),])
+
+```
+ Bayesian estiamte       Lower       Upper
+R       0.186234693 0.078927390 0.408531283
+k       0.003967030 0.002161410 0.006487891
+
+##School
+```{r}
+
+mc.school=metropolis(initial = c(0.05,0.05),iterations = 80000, offspring=school$offspring, seed=school$seed)
+visual(mc.school[-(1:30000),])
+
+
+```
+Bayesian estiamte       Lower       Upper
+R       0.078500898 0.020654407 0.169628413
+k       0.002755997 0.001016162 0.004278611
+
+##Work
+```{r}
+
+mc.work=metropolis(initial = c(0.05,0.05),iterations = 80000, offspring=work$offspring, seed=work$seed)
+visual(mc.work[-(1:30000),])
+
+
+```
+ Bayesian estiamte      Lower      Upper
+R        0.08607442 0.05119340 0.14379952
+k        0.02078832 0.01231842 0.03097982
+
+##All
+```{r}
+
+mc.all=metropolis(initial = c(0.05,0.05),iterations = 80000, offspring=cluster.data$offspring, seed=cluster.data$seed)
+visual(mc.all[-(1:30000),])
+
+
+
+acceptance.all = 1-mean(duplicated(mc.all[-(1:2000),]))
+acceptance.all
+```
+
+```{r}
+
+chain2.all=metropolis(initial = c(0.05,0.05),iterations = 80000, offspring=cluster.data$offspring, seed=cluster.data$seed)
+combine.all = mcmc.list(mc.all, chain2.all)
+
+chain2.community=metropolis(initial = c(0.05,0.05),iterations = 80000, offspring=community$offspring, seed=community$seed)
+combine.community = mcmc.list(mc.community, chain2.community)
+
+chain2.family=metropolis(initial = c(0.05,0.05),iterations = 80000, offspring=family$offspring, seed=family$seed)
+combine.family = mcmc.list(mc.family, chain2.family)
+
+chain2.hospital=metropolis(initial = c(0.05,0.05),iterations = 80000, offspring=hospital$offspring, seed=hospital$seed)
+combine.hospital = mcmc.list(mc.hospital, chain2.hospital)
+
+chain2.school=metropolis(initial = c(0.05,0.05),iterations = 80000, offspring=school$offspring, seed=school$seed)
+combine.school = mcmc.list(mc.school, chain2.school)
+
+chain2.work=metropolis(initial = c(0.05,0.05),iterations = 80000, offspring=work$offspring, seed=work$seed)
+combine.work = mcmc.list(mc.work, chain2.work)
+
+
+
+
+par(mfrow = c(2, 3))
+gelman.plot(combine.all,autoburnin=T,main='All' ) ## R and K
+gelman.plot(combine.community,autoburnin=T ,main='community') 
+gelman.plot(combine.family,autoburnin=T ,main='family') 
+gelman.plot(combine.hospital,autoburnin=T,main='hospital' ) 
+gelman.plot(combine.school,autoburnin=T ,main='school') 
+gelman.plot(combine.work,autoburnin=T ,main='work') 
+
+## mtext('Convergence diagnostics for MCMC R and k',side = 3,line = - 2,outer = TRUE)
+
+
+
+```
+
+
+
+
+## Visulization
+```{r}
+set.seed(1)
+r=rnbinom(n=500,mu=cluster.data$seed*0.5554968 ,size = cluster.data$seed*0.2212088)
+h <- hist(r,breaks = 50, plot=FALSE)
+h$counts=h$counts/sum(h$counts)
+plot(h,freq=TRUE)
+
+h1 <- hist(cluster.data$offspring,breaks = 50, plot=FALSE)
+h1$counts=h1$counts/sum(h1$counts)
+plot(h1,freq=TRUE)
+
+data %>%                               # Create tibble with frequencies
+  group_by(x, y) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+
+
+
+plot(mc.all)
+```
+```{r}
+library(dplyr)
+library(ggplot2)
+library(ggforce)
+
+
+
+
+dat=data.frame(r=c(0.5611007,0.13719468,0.08025895,0.106836804,0.186234693,0.088324163),
+               k=c(0.2208542,0.14105332,0.01910509,0.004000052,0.00396703,0.002228681),
+               x=c(0.56830355,0.139325095,0.09531335,0.188236705,0.243729337,0.161473385),
+               y=c(0.22407645,0.154075255,0.02072104,0.00447077,0.004324651,0.003189355),
+               a=c(0.07219365,0.029020495,0.04295575,0.142606465,0.164801947,0.133247063),
+               b=c(0.03821105,0.055736425,0.00871013,0.002296958,0.002163241,0.002116273),
+               groups=c('All','Family','Work','Community','Hospital','School'))
+
+dat %>% 
+ ggplot( aes(r, k,col =groups)) +
+   geom_point()+
+   geom_ellipse(aes(x0 = x, y0 = y, a = a, b = b, angle = 0) ) +
+   labs(title = "Estimated R and k and Scopes of 95% credible intervals ", x = "Reproductive Number R", y = "Dispersion Parameter k")+
+   scale_y_continuous(limits = c(0, 0.265))
+
+
+
+dat2=data.frame(r=c(0.106836804,0.186234693,0.088324163),
+               k=c(0.004000052,0.00396703,0.002228681),
+               x=c(0.188236705,0.243729337,0.161473385),
+               y=c(0.00447077,0.004324651,0.003189355),
+               a=c(0.142606465,0.164801947,0.133247063),
+               b=c(0.002296958,0.002163241,0.002116273),
+               groups=c('Community','Hospital','School'))
+
+nuuudat2 %>% 
+ ggplot( aes(r, k,col =groups)) +
+   geom_point()+
+   geom_ellipse(aes(x0 = x, y0 = y, a = a, b = b, angle = 0) ) +
+   labs(title = "Estimated R and k and Scopes of 95% Credible Intervals For Selected Groups",x = "Reproductive Number R", y = "Dispersion Parameter k")+
+   scale_y_continuous(limits = c(0, 0.023))
+
+  
+```
+
+
+```{r}
+
+```
+
+
+
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+pp <- ggplot(data=cluster.data[which(cluster.data$offspring<=10),], aes(x=offspring)) + 
+      geom_bar(aes(y = ..prop.., group = 1),fill="lightblue",width = 0.7)+
+  stat_function(fun = dnbinom, n = 101, args = list(mu = 0.561, size = 0.221),colour = "blue", size = 0.2) +
+  scale_x_continuous(name = "Secondary cases",breaks = seq(0, 10, 1))+
+  scale_y_continuous(name ="Frequency")+ ggtitle("Secondary case distribution for entire population")+theme(plot.title = element_text(size=15))
+pp
+
+
+p1 <-  ggplot(data=cluster.data[which(cluster.data$offspring<=10),], aes(x=offspring)) + 
+      geom_bar(aes(y = ..prop.., group = 1),fill="lightblue",width = 0.4)+
+  stat_function(fun = dnbinom, n = 101, args = list(mu = 0.561, size = 0.221),colour = "blue", size = 0.2) +
+  scale_x_continuous(name = "Secondary cases",breaks = seq(0, 10, 1))+
+  scale_y_continuous(name ="Frequency")+ ggtitle("Secondary case distribution for entire population")+theme(plot.title = element_text(size=7))
+
+
+p2 <-  ggplot(data=community[which(community$offspring<=10),], aes(x=offspring)) + 
+      geom_bar(aes(y = ..prop.., group = 1),fill="lightblue",width = 0.4)+
+  stat_function(fun = dnbinom, n = 101, args = list(mu = 0.107, size = 0.004),colour = "green",size = 0.2) +
+  scale_x_continuous(name = "Secondary cases",breaks = seq(0, 10, 1))+
+  scale_y_continuous(name ="Frequency")+ ggtitle("Secondary case distribution for community setting")+theme(plot.title = element_text(size=7))
+
+p3 <-  ggplot(data=family[which(family$offspring<=10),], aes(x=offspring)) + 
+      geom_bar(aes(y = ..prop.., group = 1),fill="lightblue",width = 0.4)+
+  stat_function(fun = dnbinom, n = 101, args = list(mu = 0.137, size = 0.141),colour = "#293352",size = 0.2) +
+  scale_x_continuous(name = "Secondary cases",breaks = seq(0, 10, 1))+
+  scale_y_continuous(name ="Frequency")+  ggtitle("Secondary case distribution for Household setting")+theme(plot.title = element_text(size=7))
+
+p4 <-  ggplot(data=hospital[which(hospital$offspring<=10),], aes(x=offspring)) + 
+      geom_bar(aes(y = ..prop.., group = 1),fill="lightblue",width = 0.4)+
+  stat_function(fun = dnbinom, n = 101, args = list(mu = 0.186, size = 0.004),colour = "red",size = 0.2) +
+  scale_x_continuous(name = "Secondary cases",breaks = seq(0, 10, 1))+
+  scale_y_continuous(name ="Frequency")+  ggtitle("Secondary case distribution for Healthcare setting")+theme(plot.title = element_text(size=7))
+    
+p5 <-  ggplot(data=school[which(school$offspring<=10),], aes(x=offspring)) + 
+      geom_bar(aes(y = ..prop.., group = 1),fill="lightblue",width = 0.4)+
+  stat_function(fun = dnbinom, n = 101, args = list(mu = 0.088, size = 0.002),colour = "brown",size = 0.2) +
+  scale_x_continuous(name = "Secondary cases",breaks = seq(0, 10, 1))+
+  scale_y_continuous(name ="Frequency")+  ggtitle("Secondary case distribution for School setting")+theme(plot.title = element_text(size=7))
+
+p6 <-  ggplot(data=work[which(work$offspring<=10),], aes(x=offspring)) + 
+      geom_bar(aes(y = ..prop.., group = 1),fill="lightblue",width = 0.4)+
+  stat_function(fun = dnbinom, n = 101, args = list(mu = 0.080, size = 0.019),colour = "Orange",size = 0.2) +
+  scale_x_continuous(name = "Secondary cases",breaks = seq(0, 10, 1))+
+  scale_y_continuous(name ="Frequency")+  ggtitle("Secondary case distribution for Workplace setting")+theme(plot.title = element_text(size=7))
+
+grid.arrange(p1, p2, p3,p4,p5,p6, nrow = 3)
+```
+
+
+
+
+
+
+# Epidemiology inference
+
+##the proportion of seed cases that leads to at least 1 offspring
+```{r}
+##total.seed=sum(cluster.data$seed)
+##prop1=sum(cluster.data$seed[which(cluster.data$offspring>=1)])/total.seed
+##prop1
+
+## mean(pnbinom(q=1,mu = as.numeric(cluster.data$seed)*0.5554968, size =    as.numeric(cluster.data$seed)*0.2212088,lower.tail = F))
+```
+```{r}
+## Total
+1-dnbinom(x=0,mu = 0.561, size = 0.221)
+1-dnbinom(x=0,mu = 0.496, size = 0.186)
+1-dnbinom(x=0,mu = 0.640, size = 0.262)
+
+## Community
+1-dnbinom(x=0,mu = 0.107, size = 0.004)
+1-dnbinom(x=0,mu = 0.046, size = 0.002)
+1-dnbinom(x=0,mu = 0.331, size = 0.007)
+
+## Household
+1-dnbinom(x=0,mu = 0.137, size = 0.141)
+1-dnbinom(x=0,mu = 0.110, size = 0.098)
+1-dnbinom(x=0,mu = 0.168, size = 0.210)
+
+## Health
+1-dnbinom(x=0,mu = 0.186, size = 0.004)
+1-dnbinom(x=0,mu = 0.079, size = 0.002)
+1-dnbinom(x=0,mu = 0.409, size = 0.006)
+
+## school
+1-dnbinom(x=0,mu = 0.088, size = 0.002)
+1-dnbinom(x=0,mu = 0.028, size = 0.001)
+1-dnbinom(x=0,mu = 0.295, size = 0.005)
+
+## Workplace
+1-dnbinom(x=0,mu = 0.080, size = 0.019)
+1-dnbinom(x=0,mu = 0.052, size = 0.012)
+1-dnbinom(x=0,mu = 0.138, size = 0.029)
+```
+
+
+
+
+##the proportion of the most infectious seed cases that leads to 80% offsprings
+```{r}
+index=order(cluster.data$offspring,decreasing =T)
+i=1
+temp.cumseed=0
+temp.cumoffspring=0
+while((temp.cumoffspring/sum(cluster.data$offspring))<=0.8)
+{
+  temp.cumseed=temp.cumseed+cluster.data$seed[index[i]]
+  temp.cumoffspring=temp.cumoffspring+cluster.data$offspring[index[i]]
+  i=i+1
+}
+prop2=temp.cumseed/sum(cluster.data$seed)
+prop2
+
+
+```
+```{r}
+
+f1=function(x,k=0.221,R=0.561){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.221,R=0.561){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 3))$root
+
+
+f3=function(x,k=0.221,R=0.561){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+
+
+#######
+f1=function(x,k=0.262,R=0.640){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.262,R=0.640){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 3))$root
+
+f3=function(x,k=0.262,R=0.640){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+
+
+
+####
+f1=function(x,k=0.186,R=0.496){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.186,R=0.496){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 3))$root
+
+f3=function(x,k=0.186,R=0.496){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+```
+[1] 0.1314256
+[1] 0.1154872
+[1] 0.1486698
+
+```{r}
+##Community
+f1=function(x,k=0.004,R=0.107){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.004,R=0.107){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 20))$root
+
+
+f3=function(x,k=0.004,R=0.107){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+
+
+#######
+f1=function(x,k=0.007,R=0.331){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.007,R=0.331){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 20))$root
+
+f3=function(x,k=0.007,R=0.331){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+
+
+
+####
+f1=function(x,k=0.002,R=0.046){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.002,R=0.046){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 20))$root
+
+f3=function(x,k=0.002,R=0.046){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+```
+```{r}
+##Household
+f1=function(x,k=0.141,R=0.137){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.141,R=0.137){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 20))$root
+
+
+f3=function(x,k=0.141,R=0.137){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+
+
+#######
+f1=function(x,k=0.210,R=0.168){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.210,R=0.168){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 20))$root
+
+f3=function(x,k=0.210,R=0.168){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+
+
+
+####
+f1=function(x,k=0.098,R=0.110){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.098,R=0.110){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 20))$root
+
+f3=function(x,k=0.098,R=0.110){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+```
+```{r}
+##Household
+f1=function(x,k=0.004,R=0.186){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.004,R=0.186){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 20))$root
+
+
+f3=function(x,k=0.004,R=0.186){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+
+
+#######
+f1=function(x,k=0.006,R=0.409){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.006,R=0.409){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 20))$root
+
+f3=function(x,k=0.006,R=0.409){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+
+
+
+####
+f1=function(x,k=0.002,R=0.079){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.002,R=0.079){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 20))$root
+
+f3=function(x,k=0.002,R=0.079){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+```
+```{r}
+##School
+f1=function(x,k=0.002,R=0.088){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.002,R=0.088){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 20))$root
+
+
+f3=function(x,k=0.002,R=0.088){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+
+
+#######
+f1=function(x,k=0.005,R=0.295){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.005,R=0.295){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 20))$root
+
+f3=function(x,k=0.005,R=0.295){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+
+
+
+####
+f1=function(x,k=0.001,R=0.028){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.001,R=0.028){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 20))$root
+
+f3=function(x,k=0.001,R=0.028){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+```
+```{r}
+##work
+
+f1=function(x,k=0.019,R=0.080){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.019,R=0.080){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 20))$root
+
+
+f3=function(x,k=0.019,R=0.080){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+
+
+#######
+f1=function(x,k=0.029,R=0.138){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.029,R=0.138){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 20))$root
+
+f3=function(x,k=0.029,R=0.138){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+
+
+
+####
+f1=function(x,k=0.012,R=0.052){
+  floor(x)*((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+f2=function(x,k=0.012,R=0.052){
+  integrate(f=f1,lower=0, upper=x)$value-0.2*R
+}
+z1=uniroot( f2, c(0, 20))$root
+
+f3=function(x,k=0.012,R=0.052){
+  ((R/(k+R))^floor(x))*((k/(k+R))^k)*gamma(k+floor(x))/(gamma(floor(x)+1)*gamma(k))
+}
+1-integrate(f=f3,lower=0, upper=z1)$value
+```
+
+
+
+##the proportion of seed cases that leads to superseding events under critical transmission (by using R = 2 as Poisson rate with 99-th percentile as cutoff).
+## threshold is 6
+```{r}
+threshold=qpois(0.99,lambda = 2,lower.tail = T)
+threshold
+
+```
+
+```{r}
+length(which(cluster.data$offspring>=6))/500
+
+
+## total
+1-pnbinom(q=5,mu = 0.561, size = 0.221)
+1-pnbinom(q=5,mu = 0.496, size = 0.186)
+1-pnbinom(q=5,mu = 0.640, size = 0.262)
+
+##community
+1-pnbinom(q=5,mu = 0.107, size = 0.004)
+1-pnbinom(q=5,mu = 0.046, size = 0.002)
+1-pnbinom(q=5,mu = 0.331, size = 0.007)
+
+
+##household
+1-pnbinom(q=5,mu = 0.137, size = 0.141)
+1-pnbinom(q=5,mu = 0.110, size = 0.098)
+1-pnbinom(q=5,mu = 0.168, size = 0.210)
+
+#health
+1-pnbinom(q=5,mu = 0.186, size = 0.004)
+1-pnbinom(q=5,mu = 0.079, size = 0.002)
+1-pnbinom(q=5,mu = 0.409, size = 0.006)
+
+#school
+1-pnbinom(q=5,mu =0.088, size = 0.002)
+1-pnbinom(q=5,mu = 0.028, size = 0.001)
+1-pnbinom(q=5,mu = 0.295, size = 0.005)
+
+#work
+1-pnbinom(q=5,mu =0.080 , size = 0.019)
+1-pnbinom(q=5,mu = 0.052, size = 0.012)
+1-pnbinom(q=5,mu = 0.138, size = 0.029)
+
+```
+
+
+
+
+##with 1 seed case, what is the probability to see a case cluster with a size of 10 or >10
+result in
+
+```{r}
+##total
+s=1:9
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.561,size=s*0.221))
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.496,size=s*0.186))
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.640,size=s*0.262))
+
+##community
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.107,size=s*0.004))
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.046,size=s*0.002))
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.331,size=s*0.007))
+
+##household
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.137 ,size=s*0.141))
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.110,size=s*0.098))
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.168,size=s*0.210))
+
+##health
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.186 ,size=s*0.004))
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.079,size=s*0.002))
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.409,size=s*0.006))
+
+## school
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.088 ,size=s*0.002))
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.028,size=s*0.001))
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.295,size=s*0.005))
+
+## work
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.080 ,size=s*0.019))
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.052,size=s*0.012))
+1-sum((1/s)*dnbinom(x=s-1,mu=s*0.138,size=s*0.029))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
